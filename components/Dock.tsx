@@ -29,6 +29,7 @@ export default function Dock({
   const searchBtnRef = useRef<HTMLButtonElement>(null)
   const addBtnRef = useRef<HTMLButtonElement>(null)
   const newTagRef = useRef<HTMLInputElement>(null)
+  const committingNewTag = useRef(false)
   const pinRefs = [
     useRef<HTMLInputElement>(null),
     useRef<HTMLInputElement>(null),
@@ -112,6 +113,7 @@ export default function Dock({
     }
     setNewTagValue('')
     setShowNewTagInput(false)
+    committingNewTag.current = false
   }, [newTagValue, selectedTags])
 
   const submit = async () => {
@@ -222,7 +224,8 @@ export default function Dock({
         {/* Add-mode tag selector bar */}
         {isAdd && !showPin && (
           <div className="add-tagbar">
-            {allTags.map(t => (
+            {/* Show allTags + any newly typed tags not yet saved */}
+            {[...new Set([...allTags, ...selectedTags])].sort().map(t => (
               <button
                 key={t}
                 className={`atag${selectedTags.includes(t) ? ' sel' : ''}`}
@@ -240,10 +243,17 @@ export default function Dock({
                 value={newTagValue}
                 onChange={e => setNewTagValue(e.target.value)}
                 onKeyDown={e => {
-                  if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); commitNewTag() }
+                  if (e.key === 'Enter' || e.key === ',') {
+                    e.preventDefault()
+                    committingNewTag.current = true
+                    commitNewTag()
+                  }
                   if (e.key === 'Escape') { setShowNewTagInput(false); setNewTagValue('') }
                 }}
-                onBlur={commitNewTag}
+                onBlur={() => {
+                  if (!committingNewTag.current) commitNewTag()
+                  committingNewTag.current = false
+                }}
                 autoFocus
                 maxLength={30}
               />
