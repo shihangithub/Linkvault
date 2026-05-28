@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <mask id="keyhole-cutout">
+      <rect x="0" y="0" width="64" height="64" fill="white"></rect>
+      <circle cx="32" cy="26" r="4.5" fill="black"></circle>
+      <path d="M28.5 27 L26.5 44 L37.5 44 L35.5 27 Z" fill="black"></path>
+    </mask>
+  </defs>
+  <rect x="14" y="8" width="36" height="48" rx="5" fill="#3186FF" opacity="0.18"></rect>
+  <rect x="16" y="10" width="32" height="44" rx="4" fill="#3186FF" mask="url(#keyhole-cutout)"></rect>
+  <rect x="16" y="10" width="32" height="2" rx="1" fill="#66B0FF" mask="url(#keyhole-cutout)"></rect>
+</svg>
