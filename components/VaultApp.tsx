@@ -31,12 +31,17 @@ export default function VaultApp({ initial, initialAuthed, initialTags }: Props)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [tick, setTick] = useState(0)
 
-  const [theme, setThemeState] = useState<Theme>(() =>
-    typeof window !== 'undefined' ? (localStorage.getItem('lv.theme') as Theme | null) ?? 'dark' : 'dark'
-  )
-  const [shape, setShapeState] = useState<Shape>(() =>
-    typeof window !== 'undefined' ? (localStorage.getItem('lv.shape') as Shape | null) ?? 'gallery' : 'gallery'
-  )
+  // Server-safe defaults — must match SSR output to avoid hydration mismatch
+  const [theme, setThemeState] = useState<Theme>('dark')
+  const [shape, setShapeState] = useState<Shape>('gallery')
+
+  // Hydrate from localStorage after mount (client-only, one-time sync)
+  useEffect(() => {
+    const t = localStorage.getItem('lv.theme') as Theme | null
+    const s = localStorage.getItem('lv.shape') as Shape | null
+    if (t) setThemeState(t) // eslint-disable-line react-hooks/set-state-in-effect
+    if (s) setShapeState(s)
+  }, [])
 
   const setTheme = useCallback((t: Theme) => {
     setThemeState(t)
