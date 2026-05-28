@@ -29,3 +29,21 @@ export async function fetchLinks(): Promise<Link[]> {
     return []
   }
 }
+
+export async function fetchTags(): Promise<string[]> {
+  try {
+    const supabase = getSupabaseClient()
+    const { data, error } = await supabase
+      .from('tags')
+      .select('name')
+      .order('name')
+    if (error) {
+      console.error('fetchTags error:', error.message)
+      return []
+    }
+    return (data ?? []).map((r: { name: string }) => r.name)
+  } catch (err) {
+    console.error('fetchTags exception:', err)
+    return []
+  }
+}

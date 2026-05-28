@@ -22,3 +22,12 @@ create index links_created_idx on public.links (created_at desc);
 
 -- Enable RLS with deny-by-default; the service-role key bypasses RLS entirely
 alter table public.links enable row level security;
+
+-- Tags table: master list of all tag names
+create table public.tags (
+  id         uuid        primary key default gen_random_uuid(),
+  name       text        not null unique,
+  created_at timestamptz not null default now()
+);
+create index tags_name_idx on public.tags (name);
+alter table public.tags enable row level security;

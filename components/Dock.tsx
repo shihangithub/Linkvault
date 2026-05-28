@@ -3,16 +3,14 @@
 import { useRef, useEffect, useState, useCallback } from 'react'
 import { Search, Plus, CornerDownLeft, X, Lock } from 'lucide-react'
 
-interface TagInfo { name: string; count: number }
-
 interface Props {
   mode: 'search' | 'add'
   setMode: (m: 'search' | 'add') => void
   query: string
   setQuery: (q: string) => void
   onAdd: (url: string, tags: string[]) => Promise<{ needPin?: true } | void>
-  tags: TagInfo[]       // for search-mode tag bar (with counts)
-  allTags: string[]     // for add-mode tag selector
+  dbTags: string[]                       // all tags from DB
+  tagCounts: Map<string, number>         // link-count per tag (for search mode)
   activeTag: string | null
   onTagClick: (tag: string) => void
   status: string | null
@@ -22,13 +20,13 @@ interface Props {
 
 export default function Dock({
   mode, setMode, query, setQuery,
-  onAdd, tags, allTags, activeTag, onTagClick,
+  onAdd, dbTags, tagCounts, activeTag, onTagClick,
   status, authed, onAuthSuccess,
 }: Props) {
-  const inputRef = useRef<HTMLInputElement>(null)
+  const inputRef    = useRef<HTMLInputElement>(null)
   const searchBtnRef = useRef<HTMLButtonElement>(null)
-  const addBtnRef = useRef<HTMLButtonElement>(null)
-  const newTagRef = useRef<HTMLInputElement>(null)
+  const addBtnRef   = useRef<HTMLButtonElement>(null)
+  const newTagRef   = useRef<HTMLInputElement>(null)
   const committingNewTag = useRef(false)
   const pinRefs = [
     useRef<HTMLInputElement>(null),
@@ -53,11 +51,14 @@ export default function Dock({
   const pendingAdd = useRef<{ url: string; tags: string[] } | null>(null)
 
   const cancelPin = useCallback(() => {
+    const hadPending = pendingAdd.current !== null
     setShowPin(false)
     setPinDigits(['', '', '', ''])
     setPinError(null)
     pendingAdd.current = null
-  }, [])
+    // If PIN was shown pre-emptively (no URL queued), return to search mode
+    if (!hadPending) setMode('search')
+  }, [setMode])
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -67,8 +68,9 @@ export default function Dock({
         requestAnimationFrame(() => inputRef.current?.focus())
       }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'n') {
-        e.preventDefault(); setMode('add')
-        requestAnimationFrame(() => inputRef.current?.focus())
+        e.preventDefault()
+        if (!authed) { setMode('add'); setShowPin(true) }
+        else { setMode('add'); requestAnimationFrame(() => inputRef.current?.focus()) }
       }
       if (e.key === '/' && document.activeElement?.tagName !== 'INPUT') {
         e.preventDefault(); setMode('search')
@@ -81,7 +83,7 @@ export default function Dock({
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [setMode, showPin, cancelPin])
+  }, [setMode, showPin, cancelPin, authed])
 
   // Measure capsule
   useEffect(() => {
@@ -153,30 +155,30 @@ export default function Dock({
       if (!res.ok) {
         setPinError(body.error ?? 'Incorrect PIN')
         setPinDigits(['', '', '', ''])
-        setPinRefs0Focus()
+        setTimeout(() => pinRefs[0].current?.focus(), 0)
       } else {
         onAuthSuccess()
         setShowPin(false)
         setPinDigits(['', '', '', ''])
-        // Retry the queued add
         if (pendingAdd.current) {
           const { url, tags } = pendingAdd.current
           pendingAdd.current = null
           await onAdd(url, tags)
           setAddUrl('')
           setSelectedTags([])
+        } else {
+          // Pre-emptive PIN (no pending URL) — just show the URL input
+          requestAnimationFrame(() => inputRef.current?.focus())
         }
       }
     } catch {
       setPinError('Network error. Try again.')
       setPinDigits(['', '', '', ''])
-      setPinRefs0Focus()
+      setTimeout(() => pinRefs[0].current?.focus(), 0)
     } finally {
       setPinSubmitting(false)
     }
   }
-
-  const setPinRefs0Focus = () => setTimeout(() => pinRefs[0].current?.focus(), 0)
 
   const handlePinDigit = (i: number, val: string) => {
     const digit = val.replace(/\D/g, '').slice(-1)
@@ -186,8 +188,7 @@ export default function Dock({
     setPinError(null)
     if (digit && i < 3) pinRefs[i + 1].current?.focus()
     if (digit && i === 3) {
-      // last digit — auto-submit if all filled
-      const full = [...next].join('')
+      const full = next.join('')
       if (full.length === 4) setTimeout(submitPin, 0)
     }
   }
@@ -197,6 +198,9 @@ export default function Dock({
     if (e.key === 'Enter') submitPin()
   }
 
+  // All tags to show: DB tags + any newly typed ones not yet in DB
+  const allDisplayTags = [...new Set([...dbTags, ...selectedTags])].sort()
+
   return (
     <>
       <div className="dock-protect" />
@@ -205,36 +209,64 @@ export default function Dock({
           <div className={`dock-status${err ? ' err' : ''}`}>{err || status}</div>
         )}
 
-        {/* Search-mode tag filter bar */}
-        {!isAdd && tags.length > 0 && (
+        {/* Unified tag bar — shown for both modes when tags exist */}
+        {allDisplayTags.length > 0 && (
           <div className="dock-tagbar">
-            {tags.map(t => (
-              <button
-                key={t.name}
-                className={`tag${activeTag === t.name ? ' active' : ''}`}
-                onClick={() => onTagClick(t.name)}
-              >
-                {t.name}
-                <span className="count">{t.count}</span>
-              </button>
-            ))}
+            {allDisplayTags.map(t => {
+              const count = tagCounts.get(t) ?? 0
+              const isActive = isAdd ? selectedTags.includes(t) : activeTag === t
+              return (
+                <button
+                  key={t}
+                  className={`tag${isActive ? ' active' : ''}`}
+                  onClick={() => isAdd ? toggleTag(t) : onTagClick(t)}
+                >
+                  {t}
+                  {!isAdd && count > 0 && <span className="count">{count}</span>}
+                </button>
+              )
+            })}
+
+            {/* + tag button — add mode only */}
+            {isAdd && !showPin && (
+              showNewTagInput ? (
+                <input
+                  ref={newTagRef}
+                  className="new-tag-input"
+                  placeholder="tag name…"
+                  value={newTagValue}
+                  onChange={e => setNewTagValue(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' || e.key === ',') {
+                      e.preventDefault()
+                      committingNewTag.current = true
+                      commitNewTag()
+                    }
+                    if (e.key === 'Escape') { setShowNewTagInput(false); setNewTagValue('') }
+                  }}
+                  onBlur={() => {
+                    if (!committingNewTag.current) commitNewTag()
+                    committingNewTag.current = false
+                  }}
+                  autoFocus
+                  maxLength={30}
+                />
+              ) : (
+                <button
+                  className="tag tag-plus"
+                  onClick={() => { setShowNewTagInput(true); setTimeout(() => newTagRef.current?.focus(), 0) }}
+                  title="Add new tag"
+                >
+                  <Plus size={10} /> tag
+                </button>
+              )
+            )}
           </div>
         )}
 
-        {/* Add-mode tag selector bar */}
-        {isAdd && !showPin && (
-          <div className="add-tagbar">
-            {/* Show allTags + any newly typed tags not yet saved */}
-            {[...new Set([...allTags, ...selectedTags])].sort().map(t => (
-              <button
-                key={t}
-                className={`atag${selectedTags.includes(t) ? ' sel' : ''}`}
-                onClick={() => toggleTag(t)}
-              >
-                {selectedTags.includes(t) && <X size={9} />}
-                {t}
-              </button>
-            ))}
+        {/* + tag bar when there are no DB tags yet (add mode only) */}
+        {isAdd && !showPin && allDisplayTags.length === 0 && (
+          <div className="dock-tagbar">
             {showNewTagInput ? (
               <input
                 ref={newTagRef}
@@ -259,7 +291,7 @@ export default function Dock({
               />
             ) : (
               <button
-                className="atag atag-plus"
+                className="tag tag-plus"
                 onClick={() => { setShowNewTagInput(true); setTimeout(() => newTagRef.current?.focus(), 0) }}
                 title="Add new tag"
               >
@@ -282,14 +314,22 @@ export default function Dock({
             <button
               ref={addBtnRef}
               className={`mode-btn${isAdd ? ' active' : ''}`}
-              onClick={() => { setMode('add'); requestAnimationFrame(() => inputRef.current?.focus()) }}
+              onClick={() => {
+                setMode('add')
+                if (!authed) {
+                  // Ask for PIN immediately before showing the URL input
+                  setShowPin(true)
+                } else {
+                  requestAnimationFrame(() => inputRef.current?.focus())
+                }
+              }}
             >
               <Plus size={13} /> Add
             </button>
           </div>
 
           {isAdd && showPin ? (
-            /* PIN prompt replaces the input area */
+            /* PIN prompt */
             <>
               <div className="pin-prompt">
                 <span className="pin-label">
@@ -319,7 +359,7 @@ export default function Dock({
               </button>
             </>
           ) : isAdd ? (
-            /* Add mode */
+            /* Add mode — URL input */
             <>
               <input
                 ref={inputRef}

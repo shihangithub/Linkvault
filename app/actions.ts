@@ -56,6 +56,14 @@ export async function addLink(url: string, tags: string[]): Promise<AddResult> {
     return { error: error.message }
   }
 
+  // Persist any new tags to the tags table (upsert, ignore duplicates)
+  const cleanTags = tags.filter(Boolean)
+  if (cleanTags.length > 0) {
+    await supabase
+      .from('tags')
+      .upsert(cleanTags.map(name => ({ name })), { onConflict: 'name', ignoreDuplicates: true })
+  }
+
   revalidatePath('/')
   return { success: true, link: data }
 }

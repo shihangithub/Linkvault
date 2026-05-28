@@ -15,10 +15,12 @@ interface PendingLink { id: string; domain: string; tags: string[] }
 interface Props {
   initial: Link[]
   initialAuthed: boolean
+  initialTags: string[]
 }
 
-export default function VaultApp({ initial, initialAuthed }: Props) {
+export default function VaultApp({ initial, initialAuthed, initialTags }: Props) {
   const [links, setLinks] = useState<Link[]>(initial)
+  const [dbTags, setDbTags] = useState<string[]>(initialTags)
   const [pendingLinks, setPendingLinks] = useState<PendingLink[]>([])
   const [mode, setMode] = useState<'search' | 'add'>('search')
   const [query, setQuery] = useState('')
@@ -65,21 +67,11 @@ export default function VaultApp({ initial, initialAuthed }: Props) {
     return () => clearTimeout(t)
   }, [status])
 
-  // Tag list for search-mode bar (top 12 by count)
-  const tagList = useMemo(() => {
+  // Count how many links each tag has (for display in search mode)
+  const tagCounts = useMemo(() => {
     const map = new Map<string, number>()
     links.forEach(e => (e.tags ?? []).forEach(t => map.set(t, (map.get(t) ?? 0) + 1)))
-    return [...map.entries()]
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
-      .slice(0, 12)
-  }, [links])
-
-  // All unique tags for add-mode selector
-  const allTags = useMemo(() => {
-    const set = new Set<string>()
-    links.forEach(e => (e.tags ?? []).forEach(t => set.add(t)))
-    return [...set].sort()
+    return map
   }, [links])
 
   // Filtered + sorted list
@@ -119,6 +111,13 @@ export default function VaultApp({ initial, initialAuthed }: Props) {
     }
     setLinks(prev => [result.link, ...prev])
     setPendingLinks(prev => prev.filter(p => p.id !== pendingId))
+    // Merge any newly created tags into the client-side DB tag list
+    if (tags.length > 0) {
+      setDbTags(prev => {
+        const merged = new Set([...prev, ...tags])
+        return [...merged].sort()
+      })
+    }
     setStatus('saved · just now')
   }, [])
 
@@ -219,8 +218,8 @@ export default function VaultApp({ initial, initialAuthed }: Props) {
         query={query}
         setQuery={setQuery}
         onAdd={handleAdd}
-        tags={tagList}
-        allTags={allTags}
+        dbTags={dbTags}
+        tagCounts={tagCounts}
         activeTag={activeTag}
         onTagClick={handleTagClick}
         status={status}
