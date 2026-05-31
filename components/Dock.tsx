@@ -121,16 +121,23 @@ export default function Dock({
     return () => window.removeEventListener('keydown', handler)
   }, [setMode, showPin, cancelPin, authed, editingTag, cancelEditTag, tagEditMode])
 
-  // Measure capsule
+  // Measure capsule — re-runs on mode change AND whenever the toggle container
+  // resizes (e.g. viewport crosses the mobile breakpoint, hiding button labels)
   useEffect(() => {
-    const btn = mode === 'add' ? addBtnRef.current : searchBtnRef.current
-    if (!btn) return
-    setCapsule({ left: btn.offsetLeft, width: btn.offsetWidth })
-    if (document.fonts?.ready) {
-      document.fonts.ready.then(() => {
-        if (btn.isConnected) setCapsule({ left: btn.offsetLeft, width: btn.offsetWidth })
-      })
+    const measure = () => {
+      const btn = mode === 'add' ? addBtnRef.current : searchBtnRef.current
+      if (btn?.isConnected) setCapsule({ left: btn.offsetLeft, width: btn.offsetWidth })
     }
+
+    measure()
+    document.fonts?.ready.then(measure)
+
+    // Watch the mode-toggle container for any size change
+    const toggle = searchBtnRef.current?.parentElement
+    if (!toggle) return
+    const ro = new ResizeObserver(measure)
+    ro.observe(toggle)
+    return () => ro.disconnect()
   }, [mode])
 
   // Auto-focus PIN box 0 when PIN prompt shows
