@@ -510,6 +510,7 @@ kbd {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  flex: 1; /* absorb extra height so footer stays at card bottom */
 }
 
 .asset-card .title {
