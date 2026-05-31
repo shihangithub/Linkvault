@@ -1410,11 +1410,13 @@ html.light .confirm-dialog {
     display: none;
   }
 
-  /* Mode buttons: tighter horizontal padding to reclaim space */
+  /* Mode buttons: icon-only on mobile — hide text, square up the button */
+  .mode-label {
+    display: none;
+  }
   .mode-btn {
-    padding: 0 8px;
-    font-size: 12px;
-    gap: 4px;
+    padding: 0 10px;
+    gap: 0;
   }
 
   /* PIN prompt: hide "Enter PIN" label entirely (boxes are self-evident),

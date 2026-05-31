@@ -309,7 +309,7 @@ export default function Dock({
               className={`mode-btn${!isAdd ? ' active' : ''}`}
               onClick={() => { setMode('search'); requestAnimationFrame(() => inputRef.current?.focus()) }}
             >
-              <Search size={13} /> Search
+              <Search size={13} /><span className="mode-label"> Search</span>
             </button>
             <button
               ref={addBtnRef}
@@ -324,7 +324,7 @@ export default function Dock({
                 }
               }}
             >
-              <Plus size={13} /> Add
+              <Plus size={13} /><span className="mode-label"> Add</span>
             </button>
           </div>
 
