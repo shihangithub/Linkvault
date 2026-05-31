@@ -147,6 +147,11 @@ export default function LinkCard({ entry, shape, activeTag, authed, onDelete, on
             {entry.domain}
           </div>
           {authed && (
+            <button className="preview-edit" title="Edit" onClick={handleEdit} aria-label="Edit link">
+              <Pencil size={13} />
+            </button>
+          )}
+          {authed && (
             <button className="preview-delete" title="Delete" onClick={handleDelete} aria-label="Delete">
               <Trash2 size={13} />
             </button>
@@ -173,11 +178,6 @@ export default function LinkCard({ entry, shape, activeTag, authed, onDelete, on
           <button className="btn btn-secondary btn-sm btn-icon" title={copied ? 'Copied' : 'Copy URL'} onClick={handleCopy} aria-label="Copy URL">
             {copied ? <Check size={13} /> : <Copy size={13} />}
           </button>
-          {authed && (
-            <button className="btn btn-secondary btn-sm btn-icon" title="Edit" onClick={handleEdit} aria-label="Edit link">
-              <Pencil size={13} />
-            </button>
-          )}
           <span className="spacer" />
           <span className="meta">{rel}</span>
         </div>
