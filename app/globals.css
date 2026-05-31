@@ -1310,7 +1310,7 @@ html.light .mode-toggle {
 
 .asset-card.shape-index {
   display: grid;
-  grid-template-columns: 12px minmax(0, 1fr) auto auto auto;
+  grid-template-columns: 20px minmax(0, 1fr) auto auto auto;
   align-items: center;
   gap: 14px;
   padding: 11px 16px;
@@ -1330,6 +1330,15 @@ html.light .mode-toggle {
   background: var(--surface-hover);
   transform: none;
   box-shadow: none;
+}
+
+.asset-card.shape-index .idx-favicon {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  object-fit: contain;
+  align-self: center;
+  flex-shrink: 0;
 }
 
 .asset-card.shape-index .idx-dot {

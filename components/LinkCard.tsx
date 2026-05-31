@@ -50,6 +50,7 @@ interface Props {
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export default function LinkCard({ entry, shape, activeTag, authed, onDelete, onEdit, onCopy, copied, removing, onTagClick, tick: _tick }: Props) {
   const [imgError, setImgError] = useState(false)
+  const [faviconError, setFaviconError] = useState(false)
   const tint = useMemo(() => hashTint(entry.url), [entry.url])
   const initial = (entry.title || entry.domain || '?').replace(/^www\./, '').charAt(0).toUpperCase()
   const rel = formatRelative(entry.created_at)
@@ -80,7 +81,20 @@ export default function LinkCard({ entry, shape, activeTag, authed, onDelete, on
     return (
       <div className={`card-wrap${removing ? ' removing' : ''}`}>
         <article className="asset-card shape-index" onClick={() => handleOpen()}>
-          <span className="idx-dot" style={{ background: tint.fg }} />
+          {entry.favicon && !faviconError ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={entry.favicon}
+              alt=""
+              width={16}
+              height={16}
+              className="idx-favicon"
+              referrerPolicy="no-referrer"
+              onError={() => setFaviconError(true)}
+            />
+          ) : (
+            <span className="idx-dot" style={{ background: tint.fg }} />
+          )}
           <span className="idx-text">
             <span className="idx-title">{entry.title}</span>
             <span className="idx-domain">{entry.domain}</span>
