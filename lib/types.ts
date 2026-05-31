@@ -23,3 +23,13 @@ export type DeleteResult =
   | { success: true }
   | { needPin: true }
   | { error: string }
+
+export type RenameTagResult =
+  | { success: true; oldName: string; newName: string }
+  | { needPin: true }
+  | { error: string }
+
+export type DeleteTagResult =
+  | { success: true; tagName: string }
+  | { needPin: true }
+  | { error: string }

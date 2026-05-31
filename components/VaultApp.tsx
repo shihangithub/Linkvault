@@ -7,7 +7,7 @@ import Dock from './Dock'
 import LinkCard from './LinkCard'
 import PendingCard from './PendingCard'
 import EmptyState from './EmptyState'
-import { addLink, deleteLink } from '@/app/actions'
+import { addLink, deleteLink, renameTag, deleteTag } from '@/app/actions'
 import type { Link, Shape, Theme, SortKey } from '@/lib/types'
 
 interface PendingLink { id: string; domain: string; tags: string[] }
@@ -32,6 +32,8 @@ export default function VaultApp({ initial, initialAuthed, initialTags }: Props)
   const [tick, setTick] = useState(0)
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; domain: string; snapshot: Link } | null>(null)
   const [removingId, setRemovingId] = useState<string | null>(null)
+  const [confirmDeleteTag, setConfirmDeleteTag] = useState<{ name: string } | null>(null)
+  const [confirmRenameTag, setConfirmRenameTag] = useState<{ oldName: string; newName: string } | null>(null)
 
   // Server-safe defaults — must match SSR output to avoid hydration mismatch
   const [theme, setThemeState] = useState<Theme>('dark')
@@ -172,6 +174,47 @@ export default function VaultApp({ initial, initialAuthed, initialTags }: Props)
     if (mode === 'add') setMode('search')
   }, [mode])
 
+  // Tag rename: open confirmation dialog with the pending new name
+  const handleRenameTagRequest = useCallback((oldName: string, newName: string) => {
+    setConfirmRenameTag({ oldName, newName })
+  }, [])
+
+  // Confirmed rename — call server action, optimistically update client state
+  const handleConfirmRenameTag = useCallback(async () => {
+    if (!confirmRenameTag) return
+    const { oldName, newName } = confirmRenameTag
+    setConfirmRenameTag(null)
+    const result = await renameTag(oldName, newName)
+    if ('error' in result) { setStatus(result.error); return }
+    if ('needPin' in result) { setStatus('sign in to edit tags'); return }
+    setDbTags(prev => prev.map(t => t === oldName ? result.newName : t).sort())
+    setLinks(prev => prev.map(link => ({
+      ...link,
+      tags: link.tags.map(t => t === oldName ? result.newName : t),
+    })))
+    setActiveTag(prev => prev === oldName ? result.newName : prev)
+    setStatus(`renamed · ${result.newName}`)
+  }, [confirmRenameTag])
+
+  // Tag delete: open confirmation dialog
+  const handleDeleteTagRequest = useCallback((name: string) => {
+    setConfirmDeleteTag({ name })
+  }, [])
+
+  // Confirmed delete — call server action, optimistically update client state
+  const handleConfirmDeleteTag = useCallback(async () => {
+    if (!confirmDeleteTag) return
+    const { name } = confirmDeleteTag
+    setConfirmDeleteTag(null)
+    const result = await deleteTag(name)
+    if ('error' in result) { setStatus(result.error); return }
+    if ('needPin' in result) { setStatus('sign in to edit tags'); return }
+    setDbTags(prev => prev.filter(t => t !== name))
+    setLinks(prev => prev.map(link => ({ ...link, tags: link.tags.filter(t => t !== name) })))
+    setActiveTag(prev => prev === name ? null : prev)
+    setStatus(`deleted · ${name}`)
+  }, [confirmDeleteTag])
+
   let emptyMode: 'empty' | 'no-results' | 'no-tag' | null = null
   if (filtered.length === 0 && pendingLinks.length === 0) {
     if (links.length === 0) emptyMode = 'empty'
@@ -257,7 +300,41 @@ export default function VaultApp({ initial, initialAuthed, initialTags }: Props)
         status={status}
         authed={authed}
         onAuthSuccess={() => setAuthed(true)}
+        onRenameTagRequest={handleRenameTagRequest}
+        onDeleteTagRequest={handleDeleteTagRequest}
       />
+
+      {/* Rename tag confirmation */}
+      {confirmRenameTag && (
+        <div className="confirm-overlay" onClick={() => setConfirmRenameTag(null)}>
+          <div className="confirm-dialog" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Confirm rename tag">
+            <p className="confirm-title">Rename this tag?</p>
+            <p className="confirm-body">
+              <span className="confirm-tag-old">#{confirmRenameTag.oldName}</span>
+              {' → '}
+              <span className="confirm-tag-new">#{confirmRenameTag.newName}</span>
+            </p>
+            <div className="confirm-actions">
+              <button className="btn btn-secondary" onClick={() => setConfirmRenameTag(null)}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleConfirmRenameTag} autoFocus>Rename</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete tag confirmation */}
+      {confirmDeleteTag && (
+        <div className="confirm-overlay" onClick={() => setConfirmDeleteTag(null)}>
+          <div className="confirm-dialog" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Confirm delete tag">
+            <p className="confirm-title">Delete this tag?</p>
+            <p className="confirm-body">#{confirmDeleteTag.name} will be removed from all links.</p>
+            <div className="confirm-actions">
+              <button className="btn btn-secondary" onClick={() => setConfirmDeleteTag(null)}>Cancel</button>
+              <button className="btn btn-delete" onClick={handleConfirmDeleteTag} autoFocus>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {confirmDelete && (
         <div className="confirm-overlay" onClick={() => setConfirmDelete(null)}>

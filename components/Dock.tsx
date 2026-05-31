@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useEffect, useState, useCallback } from 'react'
-import { Search, Plus, CornerDownLeft, X, Lock } from 'lucide-react'
+import { Search, Plus, CornerDownLeft, X, Lock, Pencil } from 'lucide-react'
 
 interface Props {
   mode: 'search' | 'add'
@@ -16,12 +16,15 @@ interface Props {
   status: string | null
   authed: boolean
   onAuthSuccess: () => void
+  onRenameTagRequest: (oldName: string, newName: string) => void
+  onDeleteTagRequest: (name: string) => void
 }
 
 export default function Dock({
   mode, setMode, query, setQuery,
   onAdd, dbTags, tagCounts, activeTag, onTagClick,
   status, authed, onAuthSuccess,
+  onRenameTagRequest, onDeleteTagRequest,
 }: Props) {
   const inputRef    = useRef<HTMLInputElement>(null)
   const searchBtnRef = useRef<HTMLButtonElement>(null)
@@ -43,6 +46,13 @@ export default function Dock({
   const [err, setErr] = useState<string | null>(null)
   const [capsule, setCapsule] = useState({ left: 3, width: 80 })
 
+  // Tag edit mode
+  const [tagEditMode, setTagEditMode] = useState(false)
+  const [editingTag, setEditingTag] = useState<string | null>(null)
+  const [editTagValue, setEditTagValue] = useState('')
+  const editTagRef = useRef<HTMLInputElement>(null)
+  const committingEditTag = useRef(false)
+
   // PIN state
   const [showPin, setShowPin] = useState(false)
   const [pinDigits, setPinDigits] = useState(['', '', '', ''])
@@ -59,6 +69,30 @@ export default function Dock({
     // If PIN was shown pre-emptively (no URL queued), return to search mode
     if (!hadPending) setMode('search')
   }, [setMode])
+
+  const startEditTag = useCallback((tag: string) => {
+    setEditingTag(tag)
+    setEditTagValue(tag)
+    setTimeout(() => editTagRef.current?.focus(), 0)
+  }, [])
+
+  const commitEditTag = useCallback(() => {
+    if (committingEditTag.current || !editingTag) return
+    committingEditTag.current = true
+    const cleaned = editTagValue.trim().toLowerCase().replace(/\s+/g, '-')
+    if (cleaned && cleaned !== editingTag) {
+      onRenameTagRequest(editingTag, cleaned)
+    }
+    setEditingTag(null)
+    setEditTagValue('')
+    committingEditTag.current = false
+  }, [editingTag, editTagValue, onRenameTagRequest])
+
+  const cancelEditTag = useCallback(() => {
+    setEditingTag(null)
+    setEditTagValue('')
+    committingEditTag.current = false
+  }, [])
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -78,12 +112,14 @@ export default function Dock({
       }
       if (e.key === 'Escape') {
         if (showPin) { cancelPin(); return }
+        if (editingTag) { cancelEditTag(); return }
+        if (tagEditMode) { setTagEditMode(false); return }
         if (document.activeElement?.tagName === 'INPUT') (document.activeElement as HTMLInputElement).blur()
       }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [setMode, showPin, cancelPin, authed])
+  }, [setMode, showPin, cancelPin, authed, editingTag, cancelEditTag, tagEditMode])
 
   // Measure capsule
   useEffect(() => {
@@ -209,26 +245,80 @@ export default function Dock({
           <div className={`dock-status${err ? ' err' : ''}`}>{err || status}</div>
         )}
 
-        {/* Unified tag bar — shown for both modes when tags exist */}
-        {allDisplayTags.length > 0 && (
+        {/* Unified tag bar — shown when there are tags or the + button is needed */}
+        {(allDisplayTags.length > 0 || (isAdd && !showPin)) && (
           <div className="dock-tagbar">
             {allDisplayTags.map(t => {
               const count = tagCounts.get(t) ?? 0
               const isActive = isAdd ? selectedTags.includes(t) : activeTag === t
+
+              // Inline rename input (edit mode only, for this specific tag)
+              if (tagEditMode && editingTag === t) {
+                return (
+                  <input
+                    key={t}
+                    ref={editTagRef}
+                    className="new-tag-input tag-rename-input"
+                    value={editTagValue}
+                    onChange={e => setEditTagValue(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        committingEditTag.current = true
+                        commitEditTag()
+                      }
+                      if (e.key === 'Escape') { e.preventDefault(); cancelEditTag() }
+                    }}
+                    onBlur={() => {
+                      if (!committingEditTag.current) commitEditTag()
+                    }}
+                    maxLength={30}
+                    spellCheck={false}
+                    autoComplete="off"
+                  />
+                )
+              }
+
               return (
                 <button
                   key={t}
-                  className={`tag${isActive ? ' active' : ''}`}
-                  onClick={() => isAdd ? toggleTag(t) : onTagClick(t)}
+                  className={`tag${isActive && !tagEditMode ? ' active' : ''}${tagEditMode ? ' tag-edit-mode' : ''}`}
+                  onClick={() => {
+                    if (tagEditMode) { startEditTag(t); return }
+                    if (isAdd) toggleTag(t)
+                    else onTagClick(t)
+                  }}
+                  title={tagEditMode ? `Rename "${t}"` : undefined}
                 >
-                  {t}
-                  {!isAdd && count > 0 && <span className="count">{count}</span>}
+                  <span className="tag-label">{t}</span>
+                  {!isAdd && !tagEditMode && count > 0 && <span className="count">{count}</span>}
+                  {tagEditMode && (
+                    <span
+                      className="tag-delete-btn"
+                      role="button"
+                      aria-label={`Delete tag ${t}`}
+                      onPointerDown={e => e.stopPropagation()}
+                      onClick={e => { e.stopPropagation(); onDeleteTagRequest(t) }}
+                    >×</span>
+                  )}
                 </button>
               )
             })}
 
-            {/* + tag button — add mode only */}
-            {isAdd && !showPin && (
+            {/* Pencil / edit-tags toggle — visible in both modes when authed and not in PIN prompt */}
+            {authed && !showPin && dbTags.length > 0 && (
+              <button
+                className={`tag tag-edit-toggle${tagEditMode ? ' active' : ''}`}
+                onClick={() => { setTagEditMode(v => !v); cancelEditTag() }}
+                title={tagEditMode ? 'Done' : 'Edit tags'}
+                aria-label={tagEditMode ? 'Done editing tags' : 'Edit tags'}
+              >
+                <Pencil size={10} />
+              </button>
+            )}
+
+            {/* + tag button — add mode only, not in edit mode */}
+            {isAdd && !showPin && !tagEditMode && (
               showNewTagInput ? (
                 <input
                   ref={newTagRef}
@@ -260,43 +350,6 @@ export default function Dock({
                   <Plus size={10} /> tag
                 </button>
               )
-            )}
-          </div>
-        )}
-
-        {/* + tag bar when there are no DB tags yet (add mode only) */}
-        {isAdd && !showPin && allDisplayTags.length === 0 && (
-          <div className="dock-tagbar">
-            {showNewTagInput ? (
-              <input
-                ref={newTagRef}
-                className="new-tag-input"
-                placeholder="tag name…"
-                value={newTagValue}
-                onChange={e => setNewTagValue(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter' || e.key === ',') {
-                    e.preventDefault()
-                    committingNewTag.current = true
-                    commitNewTag()
-                  }
-                  if (e.key === 'Escape') { setShowNewTagInput(false); setNewTagValue('') }
-                }}
-                onBlur={() => {
-                  if (!committingNewTag.current) commitNewTag()
-                  committingNewTag.current = false
-                }}
-                autoFocus
-                maxLength={30}
-              />
-            ) : (
-              <button
-                className="tag tag-plus"
-                onClick={() => { setShowNewTagInput(true); setTimeout(() => newTagRef.current?.focus(), 0) }}
-                title="Add new tag"
-              >
-                <Plus size={10} /> tag
-              </button>
             )}
           </div>
         )}

@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { isAuthed } from '@/lib/auth'
 import { fetchMetadata, normalizeUrl } from '@/lib/metadata'
 import { getSupabase } from '@/lib/supabase'
-import type { AddResult, DeleteResult } from '@/lib/types'
+import type { AddResult, DeleteResult, RenameTagResult, DeleteTagResult } from '@/lib/types'
 
 export async function addLink(url: string, tags: string[]): Promise<AddResult> {
   const authed = await isAuthed()
@@ -78,4 +78,38 @@ export async function deleteLink(id: string): Promise<DeleteResult> {
 
   revalidatePath('/')
   return { success: true }
+}
+
+export async function renameTag(oldName: string, newName: string): Promise<RenameTagResult> {
+  const authed = await isAuthed()
+  if (!authed) return { needPin: true }
+
+  const cleaned = newName.trim().toLowerCase().replace(/\s+/g, '-')
+  if (!cleaned) return { error: 'tag name cannot be empty' }
+  if (cleaned === oldName) return { success: true, oldName, newName: oldName }
+
+  const supabase = getSupabase()
+  const { error } = await supabase.rpc('rename_tag', { old_name: oldName, new_name: cleaned })
+  if (error) {
+    return {
+      error: error.message.includes('already exists')
+        ? `tag "${cleaned}" already exists`
+        : error.message,
+    }
+  }
+
+  revalidatePath('/')
+  return { success: true, oldName, newName: cleaned }
+}
+
+export async function deleteTag(tagName: string): Promise<DeleteTagResult> {
+  const authed = await isAuthed()
+  if (!authed) return { needPin: true }
+
+  const supabase = getSupabase()
+  const { error } = await supabase.rpc('delete_tag', { tag_name: tagName })
+  if (error) return { error: error.message }
+
+  revalidatePath('/')
+  return { success: true, tagName }
 }

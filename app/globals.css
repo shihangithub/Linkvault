@@ -877,6 +877,83 @@ html.light .dock-trail.accent {
   background: var(--accent-soft);
 }
 
+/* ── Tag edit mode ─────────────────────────────────────────────────────── */
+
+/* Chip in edit mode: signals it's clickable to rename */
+.dock-tagbar .tag.tag-edit-mode {
+  cursor: text;
+  border-color: var(--border-strong);
+  padding-right: 6px;
+}
+
+.dock-tagbar .tag.tag-edit-mode:hover {
+  border-color: var(--accent);
+  color: var(--fg);
+  background: var(--accent-soft);
+}
+
+/* × delete button inside a chip */
+.tag-delete-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--fg-dim);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+  margin-left: 3px;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.tag-delete-btn:hover {
+  background: rgba(229, 72, 77, 0.22);
+  color: var(--danger);
+}
+
+/* Pencil / edit-toggle button */
+.dock-tagbar .tag.tag-edit-toggle {
+  border-style: dashed;
+  padding: 6px 9px;
+  color: var(--fg-dim);
+}
+
+.dock-tagbar .tag.tag-edit-toggle:hover {
+  border-color: var(--fg-muted);
+  color: var(--fg-muted);
+}
+
+.dock-tagbar .tag.tag-edit-toggle.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  border-style: solid;
+  color: var(--accent-bright);
+}
+
+/* Rename inline input — inherits new-tag-input base */
+.tag-rename-input {
+  min-width: 60px;
+  max-width: 130px;
+  font-size: 11px;
+}
+
+/* Rename/delete confirm dialog: show old→new tag names clearly */
+.confirm-tag-old {
+  color: var(--fg-muted);
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+}
+
+.confirm-tag-new {
+  color: var(--accent-bright);
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+}
+
 /* Light mode: use surface-2 bg + strong border so chips are clearly visible */
 html.light .dock-tagbar .tag {
   background: var(--surface-2);
