@@ -1447,6 +1447,107 @@ html.light .confirm-dialog {
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.18);
 }
 
+/* ── Edit link dialog ────────────────────────────────────────── */
+.edit-dialog {
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  padding: 24px 24px 20px;
+  width: min(480px, calc(100vw - 40px));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+}
+
+html.light .edit-dialog {
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.18);
+}
+
+.edit-field-label {
+  font-variation-settings: 'wdth' 85, 'wght' 600;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-dim);
+  margin-top: 4px;
+}
+
+.edit-url-input {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--bg);
+  color: var(--fg);
+  outline: none;
+  width: 100%;
+  transition: border-color var(--dur-fast) var(--ease);
+}
+
+.edit-url-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-ring);
+}
+
+.edit-url-input:disabled {
+  opacity: 0.5;
+}
+
+.edit-tags-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 0 8px;
+}
+
+.edit-error {
+  font-size: 12px;
+  color: var(--danger);
+  margin: 0;
+}
+
+/* Tag chips inside the edit dialog */
+.edit-tags-row .tag {
+  flex: none;
+  font-variation-settings: 'wdth' 85, 'wght' 500;
+  font-size: 11px;
+  padding: 5px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg-muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+
+.edit-tags-row .tag:hover {
+  border-color: var(--border-strong);
+  color: var(--fg);
+}
+
+.edit-tags-row .tag.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.edit-tags-row .tag.tag-plus {
+  border-style: dashed;
+}
+
+.edit-tags-row .tag.tag-plus:hover {
+  border-color: var(--accent);
+  color: var(--accent-bright);
+  background: var(--accent-soft);
+}
+
 /* ── Responsive ──────────────────────────────────────────────── */
 @media (max-width: 640px) {
   .page {

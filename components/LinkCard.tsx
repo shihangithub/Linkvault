@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react' // useState kept for imgError
-import { Globe, ExternalLink, Copy, Check, Trash2 } from 'lucide-react'
+import { Globe, ExternalLink, Copy, Check, Trash2, Pencil } from 'lucide-react'
 import type { Link } from '@/lib/types'
 
 function formatRelative(ts: string): string {
@@ -39,6 +39,7 @@ interface Props {
   activeTag: string | null
   authed: boolean
   onDelete: (id: string) => void
+  onEdit: (id: string) => void
   onCopy: (id: string) => void
   copied: boolean
   removing: boolean
@@ -47,7 +48,7 @@ interface Props {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-export default function LinkCard({ entry, shape, activeTag, authed, onDelete, onCopy, copied, removing, onTagClick, tick: _tick }: Props) {
+export default function LinkCard({ entry, shape, activeTag, authed, onDelete, onEdit, onCopy, copied, removing, onTagClick, tick: _tick }: Props) {
   const [imgError, setImgError] = useState(false)
   const tint = useMemo(() => hashTint(entry.url), [entry.url])
   const initial = (entry.title || entry.domain || '?').replace(/^www\./, '').charAt(0).toUpperCase()
@@ -57,6 +58,10 @@ export default function LinkCard({ entry, shape, activeTag, authed, onDelete, on
   const handleDelete = (e: React.MouseEvent) => {
     e.preventDefault(); e.stopPropagation()
     onDelete(entry.id)
+  }
+  const handleEdit = (e: React.MouseEvent) => {
+    e.preventDefault(); e.stopPropagation()
+    onEdit(entry.id)
   }
   const handleCopy = (e: React.MouseEvent) => {
     e.preventDefault(); e.stopPropagation()
@@ -94,6 +99,11 @@ export default function LinkCard({ entry, shape, activeTag, authed, onDelete, on
             <button className="btn btn-secondary btn-sm btn-icon" title={copied ? 'Copied' : 'Copy URL'} onClick={handleCopy} aria-label="Copy URL">
               {copied ? <Check size={11} /> : <Copy size={11} />}
             </button>
+            {authed && (
+              <button className="btn btn-secondary btn-sm btn-icon" title="Edit" onClick={handleEdit} aria-label="Edit link">
+                <Pencil size={11} />
+              </button>
+            )}
             {authed && (
               <button className="btn btn-secondary btn-sm btn-icon danger-hover" title="Delete" onClick={handleDelete} aria-label="Delete">
                 <Trash2 size={11} />
@@ -163,6 +173,11 @@ export default function LinkCard({ entry, shape, activeTag, authed, onDelete, on
           <button className="btn btn-secondary btn-sm btn-icon" title={copied ? 'Copied' : 'Copy URL'} onClick={handleCopy} aria-label="Copy URL">
             {copied ? <Check size={13} /> : <Copy size={13} />}
           </button>
+          {authed && (
+            <button className="btn btn-secondary btn-sm btn-icon" title="Edit" onClick={handleEdit} aria-label="Edit link">
+              <Pencil size={13} />
+            </button>
+          )}
           <span className="spacer" />
           <span className="meta">{rel}</span>
         </div>

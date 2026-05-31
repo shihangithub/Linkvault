@@ -24,6 +24,11 @@ export type DeleteResult =
   | { needPin: true }
   | { error: string }
 
+export type UpdateResult =
+  | { success: true; link: Link }
+  | { needPin: true }
+  | { error: string }
+
 export type RenameTagResult =
   | { success: true; oldName: string; newName: string }
   | { needPin: true }

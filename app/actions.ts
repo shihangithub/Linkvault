@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { isAuthed } from '@/lib/auth'
 import { fetchMetadata, normalizeUrl } from '@/lib/metadata'
 import { getSupabase } from '@/lib/supabase'
-import type { AddResult, DeleteResult, RenameTagResult, DeleteTagResult } from '@/lib/types'
+import type { AddResult, DeleteResult, UpdateResult, RenameTagResult, DeleteTagResult } from '@/lib/types'
 
 export async function addLink(url: string, tags: string[]): Promise<AddResult> {
   const authed = await isAuthed()
@@ -78,6 +78,72 @@ export async function deleteLink(id: string): Promise<DeleteResult> {
 
   revalidatePath('/')
   return { success: true }
+}
+
+export async function updateLink(id: string, url: string, tags: string[]): Promise<UpdateResult> {
+  const authed = await isAuthed()
+  if (!authed) return { needPin: true }
+
+  const normalized = normalizeUrl(url)
+  if (!normalized) return { error: "couldn't parse that url" }
+
+  const supabase = getSupabase()
+
+  // Check if another row already has this URL
+  const { data: conflict } = await supabase
+    .from('links')
+    .select('id')
+    .eq('url', normalized.url)
+    .neq('id', id)
+    .maybeSingle()
+  if (conflict) return { error: 'already saved' }
+
+  // Re-fetch metadata for the (possibly new) URL
+  let metadata
+  try {
+    metadata = await fetchMetadata(normalized.url)
+  } catch {
+    // Keep existing title/image if fetch fails — get current row first
+    const { data: existing } = await supabase.from('links').select('*').eq('id', id).single()
+    metadata = {
+      title: existing?.title ?? normalized.domain,
+      description: existing?.description ?? null,
+      ogImage: existing?.og_image ?? null,
+      favicon: existing?.favicon ?? `https://www.google.com/s2/favicons?domain=${normalized.domain}&sz=64`,
+      domain: normalized.domain,
+    }
+  }
+
+  const cleanTags = tags.filter(Boolean)
+  const { data, error } = await supabase
+    .from('links')
+    .update({
+      url: normalized.url,
+      title: metadata.title,
+      description: metadata.description,
+      og_image: metadata.ogImage,
+      favicon: metadata.favicon,
+      domain: normalized.domain,
+      tags: cleanTags,
+    })
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) {
+    if (error.code === '23505') return { error: 'already saved' }
+    return { error: error.message }
+  }
+
+  // Upsert any new tags to the tags table
+  if (cleanTags.length > 0) {
+    await supabase
+      .from('tags')
+      .upsert(cleanTags.map(name => ({ name })), { onConflict: 'name', ignoreDuplicates: true })
+  }
+
+  revalidatePath('/')
+  return { success: true, link: data }
 }
 
 export async function renameTag(oldName: string, newName: string): Promise<RenameTagResult> {

@@ -1,13 +1,13 @@
 'use client'
 
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { X } from 'lucide-react'
+import { X, Plus } from 'lucide-react'
 import Header from './Header'
 import Dock from './Dock'
 import LinkCard from './LinkCard'
 import PendingCard from './PendingCard'
 import EmptyState from './EmptyState'
-import { addLink, deleteLink, renameTag, deleteTag } from '@/app/actions'
+import { addLink, deleteLink, updateLink, renameTag, deleteTag } from '@/app/actions'
 import type { Link, Shape, Theme, SortKey } from '@/lib/types'
 
 interface PendingLink { id: string; domain: string; tags: string[] }
@@ -34,6 +34,13 @@ export default function VaultApp({ initial, initialAuthed, initialTags }: Props)
   const [removingId, setRemovingId] = useState<string | null>(null)
   const [confirmDeleteTag, setConfirmDeleteTag] = useState<{ name: string } | null>(null)
   const [confirmRenameTag, setConfirmRenameTag] = useState<{ oldName: string; newName: string } | null>(null)
+  // Edit link dialog state
+  const [editingLink, setEditingLink] = useState<Link | null>(null)
+  const [editUrl, setEditUrl] = useState('')
+  const [editTags, setEditTags] = useState<string[]>([])
+  const [editNewTag, setEditNewTag] = useState<string | null>(null)
+  const [editSaving, setEditSaving] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
 
   // Server-safe defaults — must match SSR output to avoid hydration mismatch
   const [theme, setThemeState] = useState<Theme>('dark')
@@ -215,6 +222,35 @@ export default function VaultApp({ initial, initialAuthed, initialTags }: Props)
     setStatus(`deleted · ${name}`)
   }, [confirmDeleteTag])
 
+  // Open edit dialog pre-filled with the link's current data
+  const handleEditOpen = useCallback((id: string) => {
+    const link = links.find(e => e.id === id)
+    if (!link) return
+    setEditingLink(link)
+    setEditUrl(link.url)
+    setEditTags([...(link.tags ?? [])])
+    setEditNewTag(null)
+    setEditError(null)
+  }, [links])
+
+  // Save edited link
+  const handleSaveEdit = useCallback(async () => {
+    if (!editingLink) return
+    setEditSaving(true)
+    setEditError(null)
+    const result = await updateLink(editingLink.id, editUrl, editTags)
+    setEditSaving(false)
+    if ('error' in result) { setEditError(result.error); return }
+    if ('needPin' in result) { setEditError('sign in to edit'); return }
+    setLinks(prev => prev.map(e => e.id === result.link.id ? result.link : e))
+    // Merge any newly typed tags into the DB tag list
+    if (editTags.length > 0) {
+      setDbTags(prev => [...new Set([...prev, ...editTags])].sort())
+    }
+    setEditingLink(null)
+    setStatus('saved · ' + result.link.domain)
+  }, [editingLink, editUrl, editTags])
+
   let emptyMode: 'empty' | 'no-results' | 'no-tag' | null = null
   if (filtered.length === 0 && pendingLinks.length === 0) {
     if (links.length === 0) emptyMode = 'empty'
@@ -276,6 +312,7 @@ export default function VaultApp({ initial, initialAuthed, initialTags }: Props)
                 activeTag={activeTag}
                 authed={authed}
                 onDelete={handleDelete}
+                onEdit={handleEditOpen}
                 onCopy={handleCopy}
                 copied={copiedId === e.id}
                 removing={removingId === e.id}
@@ -303,6 +340,91 @@ export default function VaultApp({ initial, initialAuthed, initialTags }: Props)
         onRenameTagRequest={handleRenameTagRequest}
         onDeleteTagRequest={handleDeleteTagRequest}
       />
+
+      {/* Edit link dialog */}
+      {editingLink && (
+        <div className="confirm-overlay" onClick={() => !editSaving && setEditingLink(null)}>
+          <div className="edit-dialog" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Edit link">
+            <p className="confirm-title">Edit link</p>
+
+            {/* URL field */}
+            <label className="edit-field-label">URL</label>
+            <input
+              className="edit-url-input"
+              value={editUrl}
+              onChange={e => setEditUrl(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && !editSaving) handleSaveEdit() }}
+              spellCheck={false}
+              autoComplete="off"
+              inputMode="url"
+              disabled={editSaving}
+              autoFocus
+            />
+
+            {/* Tags multi-select */}
+            <label className="edit-field-label">Tags</label>
+            <div className="edit-tags-row">
+              {dbTags.map(t => {
+                const selected = editTags.includes(t)
+                return (
+                  <button
+                    key={t}
+                    className={`tag${selected ? ' active' : ''}`}
+                    onClick={() => setEditTags(prev =>
+                      selected ? prev.filter(x => x !== t) : [...prev, t]
+                    )}
+                    disabled={editSaving}
+                  >{t}</button>
+                )
+              })}
+              {/* New tag inline input */}
+              {editNewTag !== null ? (
+                <input
+                  className="new-tag-input"
+                  placeholder="tag name…"
+                  value={editNewTag}
+                  autoFocus
+                  onChange={e => setEditNewTag(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' || e.key === ',') {
+                      e.preventDefault()
+                      const t = editNewTag.trim().toLowerCase().replace(/\s+/g, '-')
+                      if (t && !editTags.includes(t)) setEditTags(prev => [...prev, t])
+                      setEditNewTag(null)
+                    }
+                    if (e.key === 'Escape') setEditNewTag(null)
+                  }}
+                  onBlur={() => {
+                    const t = (editNewTag ?? '').trim().toLowerCase().replace(/\s+/g, '-')
+                    if (t && !editTags.includes(t)) setEditTags(prev => [...prev, t])
+                    setEditNewTag(null)
+                  }}
+                  maxLength={30}
+                  disabled={editSaving}
+                />
+              ) : (
+                <button
+                  className="tag tag-plus"
+                  onClick={() => setEditNewTag('')}
+                  disabled={editSaving}
+                  title="Add new tag"
+                >
+                  <Plus size={10} /> tag
+                </button>
+              )}
+            </div>
+
+            {editError && <p className="edit-error">{editError}</p>}
+
+            <div className="confirm-actions">
+              <button className="btn btn-secondary" onClick={() => setEditingLink(null)} disabled={editSaving}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleSaveEdit} disabled={editSaving || !editUrl.trim()}>
+                {editSaving ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Rename tag confirmation */}
       {confirmRenameTag && (
