@@ -30,6 +30,8 @@ export default function VaultApp({ initial, initialAuthed, initialTags }: Props)
   const [status, setStatus] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [tick, setTick] = useState(0)
+  const [confirmDelete, setConfirmDelete] = useState<{ id: string; domain: string; snapshot: Link } | null>(null)
+  const [removingId, setRemovingId] = useState<string | null>(null)
 
   // Server-safe defaults — must match SSR output to avoid hydration mismatch
   const [theme, setThemeState] = useState<Theme>('dark')
@@ -126,12 +128,35 @@ export default function VaultApp({ initial, initialAuthed, initialTags }: Props)
     setStatus('saved · just now')
   }, [])
 
-  const handleDelete = useCallback(async (id: string) => {
-    // Optimistic removal
+  // Step 1: show confirmation dialog
+  const handleDelete = useCallback((id: string) => {
+    const link = links.find(e => e.id === id)
+    if (!link) return
+    setConfirmDelete({ id, domain: link.domain, snapshot: link })
+  }, [links])
+
+  // Step 2: user confirmed — animate card out, remove from UI, then hit DB; rollback on failure
+  const handleConfirmDelete = useCallback(async () => {
+    if (!confirmDelete) return
+    const { id, snapshot } = confirmDelete
+    setConfirmDelete(null)
+    // Trigger the cardOut animation on the card
+    setRemovingId(id)
+    // Wait for animation to finish before removing from DOM
+    await new Promise(r => setTimeout(r, 220))
     setLinks(prev => prev.filter(e => e.id !== id))
+    setRemovingId(null)
+    // Hit the database
     const result = await deleteLink(id)
-    if ('error' in result) setStatus('delete failed')
-  }, [])
+    if ('error' in result || 'needPin' in result) {
+      // Restore the card at its original position
+      setLinks(prev => {
+        if (prev.some(e => e.id === id)) return prev
+        return [...prev, snapshot].sort((a, b) => b.created_at.localeCompare(a.created_at))
+      })
+      setStatus('needPin' in result ? 'sign in to delete' : 'delete failed')
+    }
+  }, [confirmDelete])
 
   const handleCopy = useCallback((id: string) => {
     const e = links.find(x => x.id === id)
@@ -206,9 +231,11 @@ export default function VaultApp({ initial, initialAuthed, initialTags }: Props)
                 entry={e}
                 shape={shape}
                 activeTag={activeTag}
+                authed={authed}
                 onDelete={handleDelete}
                 onCopy={handleCopy}
                 copied={copiedId === e.id}
+                removing={removingId === e.id}
                 onTagClick={handleTagClick}
                 tick={tick}
               />
@@ -231,6 +258,19 @@ export default function VaultApp({ initial, initialAuthed, initialTags }: Props)
         authed={authed}
         onAuthSuccess={() => setAuthed(true)}
       />
+
+      {confirmDelete && (
+        <div className="confirm-overlay" onClick={() => setConfirmDelete(null)}>
+          <div className="confirm-dialog" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Confirm delete">
+            <p className="confirm-title">Delete this link?</p>
+            <p className="confirm-body">{confirmDelete.domain}</p>
+            <div className="confirm-actions">
+              <button className="btn btn-secondary" onClick={() => setConfirmDelete(null)}>Cancel</button>
+              <button className="btn btn-delete" onClick={handleConfirmDelete} autoFocus>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

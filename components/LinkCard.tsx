@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo } from 'react' // useState kept for imgError
 import { Globe, ExternalLink, Copy, Check, Trash2 } from 'lucide-react'
 import type { Link } from '@/lib/types'
 
@@ -37,16 +37,17 @@ interface Props {
   entry: Link
   shape: 'gallery' | 'index'
   activeTag: string | null
+  authed: boolean
   onDelete: (id: string) => void
   onCopy: (id: string) => void
   copied: boolean
+  removing: boolean
   onTagClick: (tag: string) => void
   tick: number // forces re-render for relative times
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-export default function LinkCard({ entry, shape, activeTag, onDelete, onCopy, copied, onTagClick, tick: _tick }: Props) {
-  const [removing, setRemoving] = useState(false)
+export default function LinkCard({ entry, shape, activeTag, authed, onDelete, onCopy, copied, removing, onTagClick, tick: _tick }: Props) {
   const [imgError, setImgError] = useState(false)
   const tint = useMemo(() => hashTint(entry.url), [entry.url])
   const initial = (entry.title || entry.domain || '?').replace(/^www\./, '').charAt(0).toUpperCase()
@@ -55,8 +56,7 @@ export default function LinkCard({ entry, shape, activeTag, onDelete, onCopy, co
 
   const handleDelete = (e: React.MouseEvent) => {
     e.preventDefault(); e.stopPropagation()
-    setRemoving(true)
-    setTimeout(() => onDelete(entry.id), 220)
+    onDelete(entry.id)
   }
   const handleCopy = (e: React.MouseEvent) => {
     e.preventDefault(); e.stopPropagation()
@@ -94,9 +94,11 @@ export default function LinkCard({ entry, shape, activeTag, onDelete, onCopy, co
             <button className="btn btn-secondary btn-sm btn-icon" title={copied ? 'Copied' : 'Copy URL'} onClick={handleCopy} aria-label="Copy URL">
               {copied ? <Check size={11} /> : <Copy size={11} />}
             </button>
-            <button className="btn btn-secondary btn-sm btn-icon danger-hover" title="Delete" onClick={handleDelete} aria-label="Delete">
-              <Trash2 size={11} />
-            </button>
+            {authed && (
+              <button className="btn btn-secondary btn-sm btn-icon danger-hover" title="Delete" onClick={handleDelete} aria-label="Delete">
+                <Trash2 size={11} />
+              </button>
+            )}
           </span>
         </article>
       </div>
@@ -134,9 +136,11 @@ export default function LinkCard({ entry, shape, activeTag, onDelete, onCopy, co
             <Globe size={11} />
             {entry.domain}
           </div>
-          <button className="preview-delete" title="Delete" onClick={handleDelete} aria-label="Delete">
-            <Trash2 size={13} />
-          </button>
+          {authed && (
+            <button className="preview-delete" title="Delete" onClick={handleDelete} aria-label="Delete">
+              <Trash2 size={13} />
+            </button>
+          )}
         </div>
         <div className="body">
           <div className="title" onClick={() => handleOpen()}>{entry.title}</div>
