@@ -77,8 +77,7 @@ export default function Dock({
   }, [])
 
   const commitEditTag = useCallback(() => {
-    if (committingEditTag.current || !editingTag) return
-    committingEditTag.current = true
+    if (!editingTag) return
     const cleaned = editTagValue.trim().toLowerCase().replace(/\s+/g, '-')
     if (cleaned && cleaned !== editingTag) {
       onRenameTagRequest(editingTag, cleaned)
@@ -278,6 +277,7 @@ export default function Dock({
                     }}
                     onBlur={() => {
                       if (!committingEditTag.current) commitEditTag()
+                      committingEditTag.current = false
                     }}
                     maxLength={30}
                     spellCheck={false}

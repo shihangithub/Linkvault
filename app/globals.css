@@ -1654,4 +1654,24 @@ html.light .edit-dialog {
     font-size: 16px; /* prevents iOS auto-zoom on focus */
     border-radius: 8px;
   }
+
+  /* ── List view on mobile ──────────────────────────────────────
+     Collapse 5-column row → 3 columns (icon | title+domain | actions).
+     Hide tags and timestamp to give the title room.
+     Actions are always visible (no hover on touch).
+  ─────────────────────────────────────────────────────────────── */
+  .asset-card.shape-index {
+    grid-template-columns: 20px minmax(0, 1fr) auto;
+    gap: 10px;
+    padding: 10px 12px;
+  }
+
+  .asset-card.shape-index .idx-tags,
+  .asset-card.shape-index .idx-meta {
+    display: none;
+  }
+
+  .asset-card.shape-index .idx-actions {
+    opacity: 1;
+  }
 }
