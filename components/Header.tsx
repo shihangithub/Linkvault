@@ -5,14 +5,13 @@ import { LayoutGrid, List, Sun, Moon } from 'lucide-react'
 import type { Shape, Theme } from '@/lib/types'
 
 interface Props {
-  count: number
   shape: Shape
   setShape: (s: Shape) => void
   theme: Theme
   setTheme: (t: Theme) => void
 }
 
-export default function Header({ count, shape, setShape, theme, setTheme }: Props) {
+export default function Header({ shape, setShape, theme, setTheme }: Props) {
   return (
     <header className="header">
       <Link className="brand" href="/" aria-label="LinkVault">
@@ -25,10 +24,7 @@ export default function Header({ count, shape, setShape, theme, setTheme }: Prop
         />
       </Link>
       <div className="header-meta">
-        <span className="count">
-          <b>{count}</b> {count === 1 ? 'entry' : 'entries'}
-        </span>
-        <div className="view-toggle" role="tablist" aria-label="View">
+<div className="view-toggle" role="tablist" aria-label="View">
           <button
             className={shape === 'gallery' ? 'active' : ''}
             onClick={() => setShape('gallery')}

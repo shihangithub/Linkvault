@@ -262,7 +262,7 @@ export default function VaultApp({ initial, initialAuthed, initialTags }: Props)
 
   return (
     <div className="app">
-      <Header count={links.length} shape={shape} setShape={setShape} theme={theme} setTheme={setTheme} />
+      <Header shape={shape} setShape={setShape} theme={theme} setTheme={setTheme} />
       <main className="page">
         {!emptyMode && (
           <div className="section-bar">
